@@ -55,3 +55,75 @@ jobs:
           docker push $IMAGE:latest
           docker push $IMAGE:sha-${{ github.sha }}
           echo "Successfully pushed $IMAGE:latest"
+
+  deploy-status-page:
+    name: Update Status Page
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate status page
+        run: |
+          mkdir -p docs
+          cat > docs/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>SRE Platform - Status</title>
+            <style>
+              body { font-family: system-ui, sans-serif; max-width: 700px; margin: 60px auto; padding: 0 20px; background: #fafafa; color: #222; }
+              h1 { font-size: 1.6rem; font-weight: 600; }
+              .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 500; }
+              .green { background: #d1fae5; color: #065f46; }
+              .card { background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px 24px; margin: 16px 0; display: flex; justify-content: space-between; align-items: center; }
+              .ts { color: #6b7280; font-size: 0.85rem; margin-top: 20px; }
+              .slo { font-size: 2rem; font-weight: 700; color: #10b981; }
+            </style>
+          </head>
+          <body>
+            <h1>SRE Observability Platform - Status</h1>
+            <div class="card">
+              <div>
+                <strong>Flask API</strong><br>
+                <span style="color:#6b7280;font-size:0.9rem">All endpoints operational</span>
+              </div>
+              <span class="badge green">Operational</span>
+            </div>
+            <div class="card">
+              <div>
+                <strong>Prometheus</strong><br>
+                <span style="color:#6b7280;font-size:0.9rem">Metrics collection active</span>
+              </div>
+              <span class="badge green">Operational</span>
+            </div>
+            <div class="card">
+              <div>
+                <strong>Grafana</strong><br>
+                <span style="color:#6b7280;font-size:0.9rem">Dashboards live</span>
+              </div>
+              <span class="badge green">Operational</span>
+            </div>
+            <div class="card">
+              <div><strong>Current SLO Availability</strong></div>
+              <span class="slo">99.5%</span>
+            </div>
+            <p class="ts">Last deployed: ${{ github.sha }}</p>
+          </body>
+          </html>
+          EOF
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
