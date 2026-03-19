@@ -1,0 +1,22 @@
+groups:
+  - name: slo_alerts
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          rate(app_errors_total[5m]) / rate(app_requests_total[5m]) > 0.05
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Error rate exceeds SLO threshold"
+          description: "Error rate is above 5% for 1 minute. SLO breach risk."
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, rate(app_request_latency_seconds_bucket[5m])) > 0.5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 latency exceeds 500ms SLO"
+          description: "95th percentile latency is above 500ms for 1 minute. SLO breach risk."
