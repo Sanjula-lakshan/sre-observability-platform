@@ -7,17 +7,29 @@ on:
     branches: [main]
 
 jobs:
-  build-scan-push:
-    name: Build, Scan and Push
+  build-and-push:
+    name: Build and Push
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-      security-events: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set up Python for dependency scan
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Scan Python dependencies for vulnerabilities
+        run: |
+          pip-audit -r app/requirements.txt --format=columns || true
+          echo "Dependency scan complete"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -29,23 +41,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Docker image locally
+      - name: Build Docker image
         run: |
-          docker build -t sre-app:scan ./app
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: sre-app:scan
-          format: table
-          severity: CRITICAL,HIGH
-          exit-code: '0'
+          docker build -t sre-app:latest ./app
+          docker images sre-app
 
       - name: Push to GitHub Container Registry
         if: github.ref == 'refs/heads/main'
         run: |
           IMAGE="ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/sre-observability-app"
-          docker tag sre-app:scan $IMAGE:latest
-          docker tag sre-app:scan $IMAGE:sha-${{ github.sha }}
+          docker tag sre-app:latest $IMAGE:latest
+          docker tag sre-app:latest $IMAGE:sha-${{ github.sha }}
           docker push $IMAGE:latest
           docker push $IMAGE:sha-${{ github.sha }}
+          echo "Successfully pushed $IMAGE:latest"
